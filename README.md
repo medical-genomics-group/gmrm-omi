@@ -53,19 +53,3 @@ This will create a new folder, which in this instance is called build_gcc_openmp
 | `--predict` | When specified, running prediction and produce .yest file. |
 | `--out-dir` | Output directory, where to store output files (.bet, .csv, _cov.csv) |
 | `--in-name-base` | Used when predicting. Estimates of marker and covariate effects will be loaded from *.bet and *_cov.csv files. |
-
-# Example
-Assuming standard HPC environment, we can run inferece for linear model:
-```
-module load gcc openmpi boost
-
-srun path/to/compiled/binary/gmrm \
-    --bin-file path/to/file/example.bin \
-    --dim-file path/to/file/example.dim \
-    --phen-files path/to/file/example.phen \
-    --group-index-file path/to/file/example.gri \
-    --group-mixture-file path/to/file/example.grm \
-    --shuffle-markers 1 \
-    --iterations 1000 \
-    --out-dir output/directory/
-```
