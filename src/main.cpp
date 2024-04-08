@@ -14,6 +14,8 @@ int main(int argc, char *argv[]) {
     BayesRR brr(opt, dims);
     if (opt.predict()) {
         brr.predict();
+    } else if (opt.test()){
+        brr.test();
     } else {
         brr.process();
     }

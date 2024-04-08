@@ -131,6 +131,147 @@ void Bayes::predict() {
         printf("INFO   : Time to compute the predictions: %.2f seconds.\n", te - ts);
 }
 
+void Bayes::test() {
+
+    double ts = MPI_Wtime();
+
+    check_openmp();
+
+    MPI_Status status;
+    MPI_Offset file_size = 0;
+    MPI_File*  fh;
+
+    Phenotype& phen = pmgr.get_phens()[0];
+
+    phen.delete_output_test_files();
+    phen.open_test_files();
+
+    fh = phen.get_inbet_fh();
+    check_mpi(MPI_File_get_size(*fh, &file_size), __LINE__, __FILE__);
+    printf("file_size = %u B\n", file_size);
+    std::cout << "file name: " << phen.get_inbet_fp() << std::endl;
+
+    // First element of the .bet is the total number of processed markers
+    // Then: iteration (uint) beta (double) for all markers
+    uint Mtot_ = 0;
+    MPI_Offset betoff = size_t(0);
+    check_mpi(MPI_File_read_at_all(*fh, betoff, &Mtot_, 1, MPI_UNSIGNED, &status), __LINE__, __FILE__);
+    if (Mtot_ != Mt) {
+        printf("Mismatch between expected and Mtot read from .bet file: %d vs %d\n", Mt, Mtot_);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    assert((file_size - sizeof(uint)) % (Mtot_ * sizeof(double) + sizeof(uint)) == 0);
+    uint niter = (file_size - sizeof(uint)) / (Mtot_ * sizeof(double) + sizeof(uint));
+    if (rank == 0)
+        printf("INFO   : Number of recorded iterations in .bet file: %u\n", niter);
+
+    double* beta_p = (double*) _mm_malloc(size_t(Mtot_) * sizeof(double), 32);
+    check_malloc(beta_p, __LINE__, __FILE__);
+    for (int i=0; i<Mtot_; i++) beta_p[i] = 0.0;
+
+    double* beta_sum = (double*) _mm_malloc(size_t(Mtot_) * sizeof(double), 32);
+    check_malloc(beta_sum, __LINE__, __FILE__);
+    for (int i=0; i<Mtot_; i++) beta_sum[i] = 0.0;
+
+    double* beta_it = (double*) _mm_malloc(size_t(Mtot_) * sizeof(double), 32);
+    check_malloc(beta_it, __LINE__, __FILE__);
+
+    uint start_iter = opt.get_burn_in();
+
+    for (uint i=start_iter; i<niter; i++) {
+        betoff
+            = sizeof(uint) // Mtot
+            + (sizeof(uint) + size_t(Mtot_) * sizeof(double)) * size_t(i)
+            + sizeof(uint);
+        check_mpi(MPI_File_read_at_all(*fh, betoff, beta_it, Mtot_, MPI_DOUBLE, &status), __LINE__, __FILE__);
+        for (int j=0; j<Mtot_;j++){
+            beta_sum[j] += beta_it[j];
+            if(beta_it[j] != 0.0)  
+                beta_p[j] += 1.0;
+        }
+    }
+
+    MPI_File* mlma_fh = phen.get_outmlma_fh();
+
+    for (int j=0; j<Mtot_;j++){
+        beta_p[j] /= double(niter);
+        beta_sum[j] /= double(niter);
+
+        char buff[LENBUF];
+
+        int cx = snprintf(buff, LENBUF, "%8d %20.15f %20.15f\n", j, beta_sum[j], beta_p[j]);
+        assert(cx >= 0 && cx < LENBUF);
+
+        MPI_Offset offset = size_t(j) * strlen(buff);
+        check_mpi(MPI_File_write_at(*mlma_fh, offset, &buff, strlen(buff), MPI_CHAR, &status), __LINE__, __FILE__);
+    }
+
+    if (rank == 0)
+        printf("INFO   : Association testing results soterd in .mlma file.\n"); 
+
+    double* g = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
+    check_malloc(g, __LINE__, __FILE__);
+    for (int i = 0; i < N; i++) g[i] = 0.0;
+
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+    for (int mrki = 0; mrki < M; mrki++) {
+
+        size_t methix = size_t(mrki) * size_t(N);
+        const double* methm = &meth_data[methix];
+
+        double mave = phen.get_marker_ave(mrki);
+        double msig = phen.get_marker_sig(mrki);
+
+        for (int i = 0; i < N; i++) {
+            double val = (methm[i] - mave);
+
+#ifdef _OPENMP
+#pragma omp atomic update
+#endif
+            g[i] += val * beta_sum[mrki];
+            
+        }
+    }
+
+    std::ofstream yest_stream;
+    yest_stream.open(phen.get_outyest_fp());
+    for (int i=0; i<N; i++){
+        yest_stream << g[i] << std::endl;
+    }
+    yest_stream.close();
+
+    if (rank == 0)
+        printf("INFO   : Predictions stored in .yest file.\n"); 
+
+    double* y = phen.get_epsilon();
+    double y_mean = 0.0;
+    double SSres = 0.0;
+    double SStot = 0.0;
+
+    for (int i=0; i<N; i++){
+        SSres += (y[i] - g[i]) * (y[i] - g[i]);
+        y_mean += y[i];
+    }
+    y_mean /= double(N);
+    for (int i=0; i<N; i++){
+        SStot += (y[i] - y_mean) * (y[i] - y_mean);
+    }
+    double r2 = 1.0 - SSres / SStot;
+
+    if (rank == 0)
+        printf("INFO   : R2 = %.4f \n", r2);
+
+    fflush(stdout);
+
+    double te = MPI_Wtime();
+
+    if (rank == 0)
+        printf("INFO   : Time to compute the association testing: %.2f seconds.\n", te - ts);
+}
+
 void Bayes::process() {
 
     double ts_overall = MPI_Wtime();
@@ -470,7 +611,7 @@ void Bayes::setup_processing() {
     if (rank == 0)
         printf("INFO   : Time to compute the markers' statistics: %.2f seconds.\n", te - ts);
 
-    if (opt.predict()) return;
+    if (opt.predict() || opt.test()) return;
 
 
         Phenotype& phen = pmgr.get_phens()[0];

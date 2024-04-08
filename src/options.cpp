@@ -148,6 +148,10 @@ void Options::read_command_line_options(int argc, char** argv) {
             predict_ = true;
             ss << "--predict " << predict_ << "\n";
 
+        } else if (!strcmp(argv[i], "--test")) {
+            test_ = true;
+            ss << "--test " << test_ << "\n";
+
         } else if (!strcmp(argv[i], "--cov-file")) {
             if (i == argc - 1) fail_if_last(argv, i);
             cov_file = argv[++i];
@@ -216,7 +220,7 @@ void Options::check_options() {
 
 
     // group index and mixture files: either both or none
-    if (! predict_) {
+    if (!predict_ && !test_) {
         if ( (group_index_file == "" && group_mixture_file != "") ||
              (group_index_file != "" && group_mixture_file == ""))  {
             std::cout << "FATAL  : you need to activate BOTH --group-index-file and --group-mixture-file" << std::endl;

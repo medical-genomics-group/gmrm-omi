@@ -266,11 +266,16 @@ public:
     void close_prediction_files();
     void delete_output_prediction_files();
 
+    void open_test_files();
+    void close_test_files();
+    void delete_output_test_files();
+
     void open_output_files();
     void close_output_files();
     void delete_output_files();
 
     void set_prediction_filenames(const std::string out_dir, const std::string in_fname_base);
+    void set_test_filenames(const std::string out_dir, const std::string in_fname_base);
 
     void set_nas_to_zero(double* y, const int N);
 

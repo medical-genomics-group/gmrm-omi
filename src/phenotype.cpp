@@ -38,7 +38,12 @@ Phenotype::Phenotype(std::string fp, const Options& opt, const int N, const int 
         check_malloc(y_, __LINE__, __FILE__);
     }
 
-    if (!opt.predict()) {
+    if (opt.predict()) {
+        set_prediction_filenames(opt.get_out_dir(), opt.get_infname_base());
+
+    } else if (opt.test()){
+        set_test_filenames(opt.get_out_dir(), opt.get_infname_base());
+    } else {
         cass = (int*) _mm_malloc(G * K * sizeof(int), 32);
         check_malloc(cass, __LINE__, __FILE__);
 
@@ -54,8 +59,6 @@ Phenotype::Phenotype(std::string fp, const Options& opt, const int N, const int 
 
         dirich.clear();
         for (int i=0; i<K; i++) dirich.push_back(1.0);
-    } else {
-        set_prediction_filenames(opt.get_out_dir(), opt.get_infname_base());
     }
 
     set_output_filenames(opt.get_out_dir());
@@ -128,6 +131,24 @@ void Phenotype::set_prediction_filenames(const std::string out_dir, const std::s
     inbet_fp = out_dir + "/" + in_fname_base + ".bet";
     std::cout << "inbet_fp = " << inbet_fp << std::endl;
 
+    fs::path pyest = base;
+    pyest += ".yest";
+    outyest_fp = pyest.string();
+    std::cout << outyest_fp << std::endl;
+
+    incov_fp = out_dir + "/" + in_fname_base + "_cov.csv";
+    std::cout << "incov_fp = " << incov_fp << std::endl;
+}
+
+// Set input filenames based on input phen file (as per output)
+void Phenotype::set_test_filenames(const std::string out_dir, const std::string in_fname_base) {
+    fs::path pphen = filepath;
+    fs::path base  = out_dir;
+    base /= pphen.stem();
+
+    inbet_fp = out_dir + "/" + in_fname_base + ".bet";
+    std::cout << "inbet_fp = " << inbet_fp << std::endl;
+
     fs::path pmlma = base;
     pmlma += ".mlma";
     outmlma_fp = pmlma.string();
@@ -169,6 +190,25 @@ void Phenotype::open_prediction_files() {
                             MPI_INFO_NULL,
                             get_inbet_fh()),
               __LINE__, __FILE__);
+/*
+    check_mpi(MPI_File_open(MPI_COMM_WORLD,
+                            get_outmlma_fp().c_str(),
+                            MPI_MODE_CREATE | MPI_MODE_WRONLY | MPI_MODE_EXCL,
+                            MPI_INFO_NULL,
+                            get_outmlma_fh()),
+              __LINE__, __FILE__);
+              */
+}
+
+// Input and output
+void Phenotype::open_test_files() {
+
+    check_mpi(MPI_File_open(MPI_COMM_WORLD,
+                            get_inbet_fp().c_str(),
+                            MPI_MODE_RDONLY,
+                            MPI_INFO_NULL,
+                            get_inbet_fh()),
+              __LINE__, __FILE__);
 
     check_mpi(MPI_File_open(MPI_COMM_WORLD,
                             get_outmlma_fp().c_str(),
@@ -176,14 +216,24 @@ void Phenotype::open_prediction_files() {
                             MPI_INFO_NULL,
                             get_outmlma_fh()),
               __LINE__, __FILE__);
+              
 }
 
 void Phenotype::close_prediction_files() {
+    check_mpi(MPI_File_close(get_inbet_fh()), __LINE__, __FILE__);
+    //check_mpi(MPI_File_close(get_outmlma_fh()), __LINE__, __FILE__);
+}
+
+void Phenotype::close_test_files() {
     check_mpi(MPI_File_close(get_inbet_fh()), __LINE__, __FILE__);
     check_mpi(MPI_File_close(get_outmlma_fh()), __LINE__, __FILE__);
 }
 
 void Phenotype::delete_output_prediction_files() {
+    //MPI_File_delete(get_outmlma_fp().c_str(), MPI_INFO_NULL);
+}
+
+void Phenotype::delete_output_test_files() {
     MPI_File_delete(get_outmlma_fp().c_str(), MPI_INFO_NULL);
 }
 

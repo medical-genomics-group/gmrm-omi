@@ -9,7 +9,7 @@ public:
     Options(int argc, char** argv) {
         read_command_line_options(argc, argv);
         check_options();
-        if (!predict())
+        if (!predict() && !test())
             read_group_mixture_file();
     }
     void read_command_line_options(int argc, char** argv);
@@ -29,6 +29,7 @@ public:
     bool shuffle_markers() const { return shuffle; }
     bool mimic_hydra() const { return mimic_hydra_; }
     bool predict() const { return predict_; }
+    bool test() const { return test_; }
     unsigned int get_seed() const { return seed; }
     unsigned int get_iterations() const { return iterations; }
     unsigned int get_burn_in() const { return burn_in; }
@@ -55,6 +56,7 @@ private:
     bool shuffle = true;
     bool mimic_hydra_ = false;
     bool predict_ = false;
+    bool test_ = false;
     unsigned int seed = 0;
     unsigned int iterations = 1;
     unsigned int truncm = 0;

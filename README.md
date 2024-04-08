@@ -51,5 +51,7 @@ This will create a new folder, which in this instance is called build_gcc_openmp
 | `--iterations` | Number of iterations to run. |
 | `--trunc-markers` | Truncate the number of markers to process. |
 | `--predict` | When specified, running prediction and produce .yest file. |
-| `--out-dir` | Output directory, where to store output files (.bet, .csv, _cov.csv) |
+| `--test` | When specified, running association testing producing .mlma file, and compute R2 prediction score. |
+| `--burn-in` | Number of excluded burn-in samples (used when --test or --predict) |
+| `--out-dir` | Output directory, where to store output files (.bet, .csv, _cov.csv, .mlma) |
 | `--in-name-base` | Used when predicting. Estimates of marker and covariate effects will be loaded from *.bet and *_cov.csv files. |

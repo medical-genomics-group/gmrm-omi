@@ -58,6 +58,7 @@ public:
     }
 
     void predict();
+    void test();
     void process();
 
     double dot_product(const int mrki, double* __restrict__ phen, const double mu, const double sigma);

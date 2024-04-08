@@ -22,7 +22,7 @@ belong to a group. Groups start at 0 and are successive. Like 0,1,2,3 if
 you have 4 groups. At least a single group with all markers.
  - ``.dim`` file is expected to be a single line file containing 2 integers: N and M, N being the number of individuals and M the number of markers.
 
-## Running GMRM-omi
+## Running inference
 Assuming standard HPC environment, we can run inference for linear model as follows. Paths were example data is stored has to be specified.
 ```
 module load gcc openmpi boost
@@ -35,6 +35,7 @@ srun path/to/compiled/binary/gmrm \
     --group-mixture-file path/to/file/example.grm \
     --shuffle-markers 1 \
     --iterations 1000 \
+    --model linear \
     --out-dir output/directory/
 ```
 
@@ -43,3 +44,24 @@ In output directory we can than find following output files:
 - ``.csv`` file with the model's hyper-parameters (variance explained by group, residual variance, SNP-heritability and markers in the model per sample). Each column of the file represents a hyperparameter and each row a posterior sample.
 
 - ``.bet`` binary file, which stores the effect sizes per SNP per posterior sample. First 4 bytes INT specifes number of markers M. Than follows iteration number (4 byte INT) and posterior samples of marker effects in current iteration M * (8 byte DOUBLE).
+
+## Running association testing and prediction
+Assuming standard HPC environment, we can run postprocessing for linear model as follows. Paths were example data is stored has to be specified. Note, that we can evaluate the performance on new .bin .phen data, such as hold-out test subset.
+```
+module load gcc openmpi boost
+
+srun path/to/compiled/binary/gmrm \
+    --bin-file path/to/file/example.bin \
+    --dim-file path/to/file/example.dim \
+    --phen-files path/to/file/example.phen \
+    --iterations 1000 \
+    --burn-in 100 \
+    --model linear
+    --out-dir output/directory/ \
+    --test
+```
+
+In output directory we can than find following output files:
+
+- ``.mlma`` text table file including the informations for all markers. Columns description: marker indicator, marker effect, posterior inclusion probability.
+- ``.yest`` text file including column vector of the estimated phenotipic outcome.
