@@ -95,7 +95,7 @@ void Options::read_command_line_options(int argc, char** argv) {
 
         }  else if (!strcmp(argv[i], "--burn-in")) {
             if (i == argc - 1) fail_if_last(argv, i);
-            if (atoi(argv[i + 1]) < 1) {
+            if (atoi(argv[i + 1]) < 0) {
                 std::cout << "FATAL  : option --burn-in iterations must be positive! (" << argv[i + 1] << " was passed)" << std::endl;
                 exit(EXIT_FAILURE);
             }

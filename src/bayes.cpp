@@ -44,9 +44,9 @@ void Bayes::predict() {
     }
 
     assert((file_size - sizeof(uint)) % (Mtot_ * sizeof(double) + sizeof(uint)) == 0);
-    uint niter = (file_size - sizeof(uint)) / (Mtot_ * sizeof(double) + sizeof(uint));
+    uint max_iter = (file_size - sizeof(uint)) / (Mtot_ * sizeof(double) + sizeof(uint));
     if (rank == 0)
-        printf("INFO   : Number of recorded iterations in .bet file: %u\n", niter);
+        printf("INFO   : Number of recorded iterations in .bet file: %u\n", max_iter);
 
     double* beta_sum = (double*) _mm_malloc(size_t(Mtot_) * sizeof(double), 32);
     check_malloc(beta_sum, __LINE__, __FILE__);
@@ -56,8 +56,8 @@ void Bayes::predict() {
     check_malloc(beta_it, __LINE__, __FILE__);
 
     uint start_iter = opt.get_burn_in();
-
-    for (uint i=start_iter; i<niter; i++) {
+    uint niter = max_iter - start_iter;
+    for (uint i=start_iter; i<max_iter; i++) {
         betoff
             = sizeof(uint) // Mtot
             + (sizeof(uint) + size_t(Mtot_) * sizeof(double)) * size_t(i)
@@ -119,6 +119,7 @@ void Bayes::predict() {
 
     std::ofstream yest_stream;
     yest_stream.open(phen.get_outyest_fp());
+    yest_stream.precision(int(15));
     for (int i=0; i<N; i++){
         double z = g[i];// + c[i];
         yest_stream << z << std::endl;
@@ -162,9 +163,9 @@ void Bayes::test() {
     }
 
     assert((file_size - sizeof(uint)) % (Mtot_ * sizeof(double) + sizeof(uint)) == 0);
-    uint niter = (file_size - sizeof(uint)) / (Mtot_ * sizeof(double) + sizeof(uint));
+    uint max_iter = (file_size - sizeof(uint)) / (Mtot_ * sizeof(double) + sizeof(uint));
     if (rank == 0)
-        printf("INFO   : Number of recorded iterations in .bet file: %u\n", niter);
+        printf("INFO   : Number of recorded iterations in .bet file: %u\n", max_iter);
 
     double* beta_p = (double*) _mm_malloc(size_t(Mtot_) * sizeof(double), 32);
     check_malloc(beta_p, __LINE__, __FILE__);
@@ -178,8 +179,10 @@ void Bayes::test() {
     check_malloc(beta_it, __LINE__, __FILE__);
 
     uint start_iter = opt.get_burn_in();
-
-    for (uint i=start_iter; i<niter; i++) {
+    uint niter = max_iter - start_iter;
+    if (rank == 0)
+        printf("INFO   : Number of iterations after burn-in period: %u\n", niter);
+    for (uint i=start_iter; i<max_iter; i++) {
         betoff
             = sizeof(uint) // Mtot
             + (sizeof(uint) + size_t(Mtot_) * sizeof(double)) * size_t(i)
@@ -200,7 +203,7 @@ void Bayes::test() {
 
         char buff[LENBUF];
 
-        int cx = snprintf(buff, LENBUF, "%8d %20.15f %20.15f\n", j, beta_sum[j], beta_p[j]);
+        int cx = snprintf(buff, LENBUF, "%8d\t%20.15f\t%20.15f\n", j, beta_sum[j], beta_p[j]);
         assert(cx >= 0 && cx < LENBUF);
 
         MPI_Offset offset = size_t(j) * strlen(buff);
@@ -238,6 +241,7 @@ void Bayes::test() {
 
     std::ofstream yest_stream;
     yest_stream.open(phen.get_outyest_fp());
+    yest_stream.precision(int(15));
     for (int i=0; i<N; i++){
         yest_stream << g[i] << std::endl;
     }
