@@ -64,7 +64,7 @@ private:
     std::vector<double> sigmag;
     double mu     = 0.0;
     void read_file(const Options& opt);
-    void set_output_filenames(const std::string out_dir);
+    void set_output_filenames(const std::string out_dir, const std::string out_name);
 
 public:
     Phenotype(std::string fp, const Options& opt, const int N, const int M);

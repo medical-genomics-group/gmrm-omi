@@ -12,6 +12,8 @@
 #include <regex>
 
 void Bayes::predict() {
+    if (rank == 0)
+        printf("\n----- PREDICTION -----\n");
 
     double ts = MPI_Wtime();
 
@@ -134,6 +136,9 @@ void Bayes::predict() {
 
 void Bayes::test() {
 
+    if (rank == 0)
+        printf("\n----- ASSOCIATION TESTING -----\n");
+
     double ts = MPI_Wtime();
 
     check_openmp();
@@ -239,18 +244,18 @@ void Bayes::test() {
         }
     }
 
-    std::ofstream yest_stream;
-    yest_stream.open(phen.get_outyest_fp());
-    yest_stream.precision(int(15));
-    for (int i=0; i<N; i++){
-        yest_stream << g[i] << std::endl;
-    }
-    yest_stream.close();
+    //std::ofstream yest_stream;
+    //yest_stream.open(phen.get_outyest_fp());
+    //yest_stream.precision(int(15));
+    //for (int i=0; i<N; i++){
+    //    yest_stream << g[i] << std::endl;
+    //}
+    //yest_stream.close();
 
-    if (rank == 0)
-        printf("INFO   : Predictions stored in .yest file.\n"); 
+    //if (rank == 0)
+    //    printf("INFO   : Predictions stored in .yest file.\n"); 
 
-    double* y = phen.get_epsilon();
+    double* y = phen.get_y();
     double y_mean = 0.0;
     double SSres = 0.0;
     double SStot = 0.0;
@@ -276,7 +281,10 @@ void Bayes::test() {
         printf("INFO   : Time to compute the association testing: %.2f seconds.\n", te - ts);
 }
 
-void Bayes::process() {
+void Bayes::infer() {
+
+    if (rank == 0)
+        printf("\n----- INFERENCE -----\n");
 
     double ts_overall = MPI_Wtime();
 
@@ -615,7 +623,7 @@ void Bayes::setup_processing() {
     if (rank == 0)
         printf("INFO   : Time to compute the markers' statistics: %.2f seconds.\n", te - ts);
 
-    if (opt.predict() || opt.test()) return;
+    if (!opt.infer()) return;
 
 
         Phenotype& phen = pmgr.get_phens()[0];

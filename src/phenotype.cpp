@@ -34,16 +34,19 @@ Phenotype::Phenotype(std::string fp, const Options& opt, const int N, const int 
     if(opt.get_model() == "probit"){
         z_ = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
         check_malloc(z_, __LINE__, __FILE__);
-        y_ = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
-        check_malloc(y_, __LINE__, __FILE__);
     }
+    y_ = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
+    check_malloc(y_, __LINE__, __FILE__);
+    
 
     if (opt.predict()) {
         set_prediction_filenames(opt.get_out_dir(), opt.get_infname_base());
 
-    } else if (opt.test()){
+    } 
+    if (opt.test()){
         set_test_filenames(opt.get_out_dir(), opt.get_infname_base());
-    } else {
+    } 
+    if (opt.infer()) {
         cass = (int*) _mm_malloc(G * K * sizeof(int), 32);
         check_malloc(cass, __LINE__, __FILE__);
 
@@ -61,8 +64,9 @@ Phenotype::Phenotype(std::string fp, const Options& opt, const int N, const int 
         for (int i=0; i<K; i++) dirich.push_back(1.0);
     }
 
-    set_output_filenames(opt.get_out_dir());
+    set_output_filenames(opt.get_out_dir(), opt.get_infname_base());
     read_file(opt);
+
 }
 
 //copy ctor
@@ -153,32 +157,40 @@ void Phenotype::set_test_filenames(const std::string out_dir, const std::string 
     pmlma += ".mlma";
     outmlma_fp = pmlma.string();
 
-    fs::path pyest = base;
-    pyest += ".yest";
-    outyest_fp = pyest.string();
-    std::cout << outyest_fp << std::endl;
+    //fs::path pyest = base;
+    //pyest += ".yest";
+    //outyest_fp = pyest.string();
+    //std::cout << outyest_fp << std::endl;
 
     incov_fp = out_dir + "/" + in_fname_base + "_cov.csv";
     std::cout << "incov_fp = " << incov_fp << std::endl;
 }
 
-void Phenotype::set_output_filenames(const std::string out_dir) {
-    fs::path pphen = filepath;
-    fs::path base  = out_dir;
-    base /= pphen.stem();
-    fs::path pbet = base;
-    pbet += ".bet";
-    fs::path pcpn = base;
-    pcpn += ".cpn";
-    fs::path pcsv = base;
-    pcsv += ".csv";
-    fs::path pcov = base;
-    pcov += "_cov.csv";
+void Phenotype::set_output_filenames(const std::string out_dir, const std::string out_name) {
+    //fs::path pphen = filepath;
+    //fs::path base  = out_dir;
+    //base /= pphen.stem();
+    //fs::path pbet = base;
+    //pbet += ".bet";
+    //fs::path pcpn = base;
+    //pcpn += ".cpn";
+    //fs::path pcsv = base;
+    //pcsv += ".csv";
+    //fs::path pcov = base;
+    //pcov += "_cov.csv";
 
-    outbet_fp = pbet.string();
-    outcpn_fp = pcpn.string();
-    outcsv_fp = pcsv.string();
-    outcov_fp = pcov.string();
+    //outbet_fp = pbet.string();
+    //outcpn_fp = pcpn.string();
+    //outcsv_fp = pcsv.string();
+    //outcov_fp = pcov.string();
+    
+    outbet_fp = out_dir + "/" + out_name + ".bet";
+    outcpn_fp = out_dir + "/" + out_name + ".cpn";
+    outcsv_fp = out_dir + "/" + out_name + ".csv";
+    outcov_fp = out_dir + "/" + out_name + "_cov.csv";
+
+    std::cout << "outcsv_fp = " << outcsv_fp << std::endl;
+
 }
 
 // Input and output
@@ -230,7 +242,7 @@ void Phenotype::close_test_files() {
 }
 
 void Phenotype::delete_output_prediction_files() {
-    //MPI_File_delete(get_outmlma_fp().c_str(), MPI_INFO_NULL);
+    MPI_File_delete(get_outmlma_fp().c_str(), MPI_INFO_NULL);
 }
 
 void Phenotype::delete_output_test_files() {
@@ -746,8 +758,10 @@ void Phenotype::read_file(const Options& opt) {
             sqn = sqrt(double(nonas-1) / sqn);
             if (opt.verbosity_level(3))
                 printf("phen sqn = %20.15f\n", sqn);
-            for (int i=0; i<data.size(); i++)
+            for (int i=0; i<data.size(); i++){
                 epsilon[i] *= sqn;
+                y[i] = epsilon[i];
+            }
         }    
     } else {
         std::cout << "FATAL: could not open phenotype file: " << filepath << std::endl;

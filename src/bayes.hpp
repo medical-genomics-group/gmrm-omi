@@ -31,7 +31,7 @@ public:
         S = 0;
         Mm = Mt;
 
-        if (!opt.predict()) {
+        if (opt.infer()) {
             
             pi_prior.resize(G);
             mtotgrp.resize(G);
@@ -59,7 +59,7 @@ public:
 
     void predict();
     void test();
-    void process();
+    void infer();
 
     double dot_product(const int mrki, double* __restrict__ phen, const double mu, const double sigma);
     void list_phen_files() const { opt.list_phen_files(); }

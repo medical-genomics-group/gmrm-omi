@@ -12,12 +12,14 @@ int main(int argc, char *argv[]) {
     const Options    opt(argc, argv);
     const Dimensions dims(opt);
     BayesRR brr(opt, dims);
-    if (opt.predict()) {
-        brr.predict();
-    } else if (opt.test()){
+    if (opt.infer()) {
+        brr.infer();
+    }
+    if (opt.test()){
         brr.test();
-    } else {
-        brr.process();
+    } 
+    if (opt.predict()){
+        brr.predict();
     }
 
     MPI_Finalize();

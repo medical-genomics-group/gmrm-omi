@@ -50,8 +50,9 @@ This will create a new folder, which in this instance is called build_gcc_openmp
 | `--seed` | Seed for pseudo-random number generator (Mersenne twister). |
 | `--iterations` | Number of iterations to run. |
 | `--trunc-markers` | Truncate the number of markers to process. |
-| `--predict` | When specified, running prediction and produce .yest file. |
-| `--test` | When specified, running association testing producing .mlma file, and compute R2 prediction score. |
+| `--predict` | When specified, runs prediction only, producing .yest file. If not specified, runs inference and test |
+| `--test` | When specified, runs association testing only, producing .mlma file and compute R2 prediction score. If not specified, runs inference and test |
+| `--infer` | When specified, runs inference only. If not specified, runs inference and test |
 | `--burn-in` | Number of excluded burn-in samples (used when --test or --predict) |
 | `--out-dir` | Output directory, where to store output files (.bet, .csv, _cov.csv, .mlma) |
 | `--in-name-base` | Used when predicting. Estimates of marker and covariate effects will be loaded from *.bet and *_cov.csv files. |
