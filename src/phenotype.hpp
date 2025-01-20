@@ -178,15 +178,7 @@ public:
         }
     }
     void load_cov_deltas();
-    void avg_deltas_it(int niter) {
-        for(int covi = 0; covi < C; covi++){
-            deltas[covi] = 0.0;
-            for(int iter = 0; iter < niter; iter++){ 
-                deltas[covi] += deltas_it[iter][covi];
-            }
-            deltas[covi] /= double(niter);
-        }
-    }
+
     int    get_marker_local_index(const int shuff_idx);
     double get_marker_ave(const int idx) { return mave[idx]; }
     double get_marker_sig(const int idx) { return msig[idx]; }

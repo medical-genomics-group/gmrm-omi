@@ -467,35 +467,17 @@ void Phenotype::load_cov_deltas(){
 
     std::ifstream covf(incov_fp);
     std::string line; 
-    std::regex re("\\s+");
+    std::regex re(",");
 
-    int line_i = 0;
+    std::getline(covf, line); // read the current line
 
-    while (std::getline(covf, line)) // read the current line
-    {
-        int Cobs = 0;
-        std::vector<double> entries;
-        std::sregex_token_iterator iter(line.begin(), line.end(), re, -1);
-        std::sregex_token_iterator re_end;
+    std::sregex_token_iterator iter(line.begin(), line.end(), re, -1);
+    std::sregex_token_iterator re_end;
         
-        ++iter; // skip line number
-        ++iter; // skip iteration
-        ++iter; // skip number of covariates
-        for ( ; iter != re_end; ++iter){
-            entries.push_back(std::stod(*iter));
-            Cobs++;
-        }
-
-        if (Cobs != C){
-            printf("FATAL   : number of covariate deltas = %d does not match to the specified number of covariates = %d.\n", Cobs, C);
-            exit(EXIT_FAILURE);
-        }
-        
-        deltas_it.push_back(entries); 
-        line_i++;   
+    for(int covi = 0; covi < C; covi++){
+        double d = std::stod(*iter);
+        deltas[covi] = d;
     }
-
-    printf("INFO   : Number of loaded lines from _cov.csv file = %d \n", line_i);
 
     double te = MPI_Wtime();
 
@@ -524,7 +506,7 @@ void Phenotype::update_epsilon_cov(const int covi, double delta) {
 #pragma omp parallel for
 #endif
     for (int i=0; i<N; i++) {
-        epsilon[i] += delta * Z_[i][covi];    
+        epsilon[i] += delta * Z_[i][covi];  
     }
 }
 

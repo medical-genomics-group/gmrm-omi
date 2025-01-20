@@ -69,23 +69,22 @@ void Bayes::predict() {
 
     for (int j=0; j<Mtot_;j++)
         beta_sum[j] /= double(niter);
-        /*
-        if(C > 0){
-            phen.load_cov_deltas();
-            phen.set_Z(Z);
-            phen.avg_deltas_it(niter);
-        }
-        std::vector<double>* deltas = phen.get_deltas();
-
-        double* c = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
-        check_malloc(c, __LINE__, __FILE__);
         
-        for (int i=0; i<N; i++){
-            c[i] = 0.0;
-            for(int covi = 0; covi<C; covi++){
-                c[i] += deltas->at(covi) * Z[i][covi];
-            }
-        }*/
+    if(C > 0){
+        phen.load_cov_deltas();
+        phen.set_Z(Z);
+    }
+    std::vector<double>* deltas = phen.get_deltas();
+
+    double* c = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
+    check_malloc(c, __LINE__, __FILE__);
+        
+    for (int i=0; i<N; i++){
+        c[i] = 0.0;
+        for(int covi = 0; covi<C; covi++){
+            c[i] += deltas->at(covi) * Z[i][covi];
+        }
+    }
         
     fflush(stdout);
 
@@ -121,7 +120,7 @@ void Bayes::predict() {
     yest_stream.open(phen.get_outyest_fp());
     yest_stream.precision(int(15));
     for (int i=0; i<N; i++){
-        double z = g[i];// + c[i];
+        double z = g[i] + c[i];
         yest_stream << z << std::endl;
     }
     yest_stream.close();
@@ -298,6 +297,35 @@ void Bayes::process() {
     // number of covariates
     int C = opt.get_cov_num();
 
+    // Covariates
+    if(C > 0){
+        for(int covi = 0; covi < C; covi++){
+            // Update epsilon with respect to previous covariate effect
+            double delta = phen.get_cov_delta(covi);
+            phen.update_epsilon_cov(covi, delta);
+
+            double cov_num = phen.dot_product_cov(covi);
+            double cov_denom = phen.get_cov_denom(covi);
+            double delta_new = 0.0;
+
+            if(cov_denom > 0){
+                // Sample new covariate effect delta
+                // delta_new = phen.sample_norm_rng(cov_num / cov_denom, 1.0 / cov_denom);
+                delta_new = cov_num / cov_denom;
+            }
+
+            phen.set_cov_delta(covi, delta_new);
+            //printf("New delta[%d] = %0.6f\n", covi, delta_new);
+            //fflush(stdout);
+
+
+            // Update epsilon with respect to the new covariate effect
+            phen.update_epsilon_cov(covi, delta_new);
+        }
+
+        write_ofile_cov(*(phen.get_outcov_fh()),  phen.get_deltas());
+    }
+
     for (unsigned int it = 1; it <= opt.get_iterations(); it++) {
 
         double ts_it = MPI_Wtime();
@@ -355,30 +383,6 @@ void Bayes::process() {
         
         fflush(stdout);
 
-        // Covariates
-        if(C > 0){
-            for(int covi = 0; covi < C; covi++){
-                // Update epsilon with respect to previous covariate effect
-                double delta = phen.get_cov_delta(covi);
-                phen.update_epsilon_cov(covi, delta);
-
-                double cov_num = phen.dot_product_cov(covi);
-                double cov_denom = phen.get_cov_denom(covi);
-                double delta_new = 0.0;
-
-                if(cov_denom > 0){
-                    // Sample new covariate effect delta
-                    delta_new = phen.sample_norm_rng(cov_num / cov_denom, 1.0 / cov_denom);
-                }
-
-                phen.set_cov_delta(covi, delta_new);
-                //printf("New delta[%d] = %0.6f\n", covi, delta_new);
-                //fflush(stdout);
-
-                // Update epsilon with respect to the new covariate effect
-                phen.update_epsilon_cov(covi, -delta_new);
-            }
-        }
         //fflush(stdout);
 
         double dbetas[3]; // [ dbeta:mave:msig ]
@@ -557,9 +561,6 @@ void Bayes::process() {
         if (it % opt.get_output_thin_rate() == 0) {
             const unsigned nthinned = it / opt.get_output_thin_rate() - 1;
             write_ofile_csv(*(phen.get_outcsv_fh()), it,  phen.get_sigmag(), phen.get_sigmae(), phen.get_m0_sum(), nthinned, phen.get_pi_est());
-            if(C > 0){
-                write_ofile_cov(*(phen.get_outcov_fh()), it,  phen.get_deltas(), nthinned);
-            }
             
             write_ofile_h1(*(phen.get_outbet_fh()), rank, Mt, it, nthinned, S, M, phen.get_betas().data(), MPI_DOUBLE);
             write_ofile_h1(*(phen.get_outcpn_fh()), rank, Mt, it, nthinned, S, M, phen.get_comp().data(),  MPI_INTEGER); 

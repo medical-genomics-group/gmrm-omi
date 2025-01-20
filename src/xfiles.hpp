@@ -10,7 +10,7 @@
 void write_ofile_csv(const MPI_File fh, const uint iteration, const std::vector<double>* sigmaG, const double sigmaE, const int m0_sum,
                      const uint n_thinned_saved, const std::vector<std::vector<double>>* estPi);
 
-void write_ofile_cov(const MPI_File fh, const uint iteration, const std::vector<double>* delta, const uint n_thinned_saved);
+void write_ofile_cov(const MPI_File fh, const std::vector<double>* delta);
 
 // History file with layout: Mtot | [ iteration | rank_0_data ... rank_N_data ] 
 template <class T>
