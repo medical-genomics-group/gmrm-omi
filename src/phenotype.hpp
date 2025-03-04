@@ -11,6 +11,7 @@
 class Phenotype {
 
 private:
+    int rank;
     Distributions dist_m; // for shuffling the markers
     Distributions dist_d; // for sampling the distributions
     std::string filepath;
@@ -57,12 +58,14 @@ private:
     double* msig     = nullptr;
     double* epsilon_ = nullptr;
     double* z_       = nullptr;
+    double* Xbeta_   = nullptr;
     double* y_       = nullptr;
     int*    cass     = nullptr;
     double epssum = 0.0;
     double sigmae_ = 0.0;
     std::vector<double> sigmag;
     double mu     = 0.0;
+    double probit_var = 1.0;
     void read_file(const Options& opt);
     void set_output_filenames(const std::string out_dir);
 
@@ -115,6 +118,7 @@ public:
     double* get_msig()        { return msig; }
     double* get_epsilon()     { return epsilon_; }
     double* get_z()           { return z_; }
+    double* get_Xbeta()           { return Xbeta_; }
     double* get_y()           { return y_; } 
     double  get_epsilon_sum() { return epssum; }
     double  get_sigmae()      { return sigmae_; }
@@ -183,10 +187,13 @@ public:
     double get_marker_ave(const int idx) { return mave[idx]; }
     double get_marker_sig(const int idx) { return msig[idx]; }
 
-    void   init_latent();
+    void   sample_latent();
+    void   init_Xbeta();
     void   update_latent(const int mloc, const double* meth);
+    void   update_Xbeta(const int mloc, const double* meth);
     void   offset_latent(const double offset);
-    void   update_latent_cov(const int covi, double delta);
+    void   offset_Xbeta(const double offset);
+    void   adjust_epsilon_cov();
     double dot_product_cov(int covi);
 
     void   init_epsilon();
@@ -270,6 +277,9 @@ public:
     void set_test_filenames(const std::string out_dir, const std::string in_fname_base);
 
     void set_nas_to_zero(double* y, const int N);
+    void Newton_method_cov();
+    std::vector<double> grad_cov(std::vector<double> eta);
+    double mlogL_probit(std::vector<double> eta);
 
     //EO: trick for --prediction, assumed epsilon unchanged!!
     void get_centered_and_scaled_y(double* y_k) {

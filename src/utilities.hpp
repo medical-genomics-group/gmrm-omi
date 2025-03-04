@@ -2,7 +2,7 @@
 #include <assert.h>
 #include <cmath>
 #include <immintrin.h>
-
+#include <vector>
 
 void check_malloc(const void* ptr, const int linenumber, const char* filename);
 
@@ -79,3 +79,7 @@ void mpi_file_write_at_all(const size_t N, MPI_Offset offset, MPI_File fh, MPI_D
         check_mpi(MPI_File_write_at_all(fh, offset + iim * size_t(dtsize), &buffer[iim], count, MPI_DT, &status), __LINE__, __FILE__);
     }
 }
+double l2_norm2(std::vector<double> const& u, int sync);
+double inner_prod(std::vector<double> const& u, std::vector<double> const& v, int sync);
+double erfcx (double x);
+double normal_cdf(double value);

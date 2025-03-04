@@ -9,6 +9,9 @@
 #include <boost/range/algorithm.hpp>
 #include <boost/random/uniform_int.hpp>
 #include <filesystem>
+#include <boost/numeric/ublas/vector.hpp>
+#include <boost/numeric/ublas/matrix.hpp>
+#include <boost/numeric/ublas/lu.hpp>
 
 namespace fs = std::filesystem;
 
@@ -21,6 +24,8 @@ Phenotype::Phenotype(std::string fp, const Options& opt, const int N, const int 
     K(opt.get_nmixtures()),
     C(opt.get_cov_num()),
     G(opt.get_ngroups()) {
+    
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 
     deltas = std::vector<double> (C, 0.0);
     cov_denom = std::vector<double> (C, 0.0);
@@ -31,11 +36,13 @@ Phenotype::Phenotype(std::string fp, const Options& opt, const int N, const int 
     check_malloc(msig, __LINE__, __FILE__);
     epsilon_ = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
     check_malloc(epsilon_, __LINE__, __FILE__);
+    y_ = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
+    check_malloc(y_, __LINE__, __FILE__);
     if(opt.get_model() == "probit"){
         z_ = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
         check_malloc(z_, __LINE__, __FILE__);
-        y_ = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
-        check_malloc(y_, __LINE__, __FILE__);
+        Xbeta_ = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
+        check_malloc(z_, __LINE__, __FILE__);
     }
 
     if (opt.predict()) {
@@ -403,20 +410,34 @@ void Phenotype::shuffle_midx(const bool mimic_hydra) {
     }
 }
 
-// Set latent variable to 0 for all individuals
-void Phenotype::init_latent(){
+// Sample artificial target from truncated normal
+void Phenotype::sample_latent(){
     double* z = get_z();
+    double* y = get_y();
+    double* Xbeta = get_Xbeta();
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+    for (int i=0; i<N; i++) {
+        z[i] = sample_trunc_norm_rng(Xbeta[i], 1.0, y[i]);    
+    }
+}
+
+// Set Xbeta variable to 0 for all individuals
+void Phenotype::init_Xbeta(){
+    double* Xbeta = get_Xbeta();
 
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
     for (int i=0; i<N; i++) 
-        z[i] = 0.0;
+        Xbeta[i] = 0.0;
 }
 
 // Update latent variable based on current marker and effect
-void Phenotype::update_latent(const int mloc, const double* meth) {
-    double* z = get_z();
+void Phenotype::update_Xbeta(const int mloc, const double* meth) {
+    double* Xbeta = get_Xbeta();
     double beta = get_marker_beta(mloc);
     double mave = get_marker_ave(mloc);
     double msig = get_marker_sig(mloc);
@@ -426,38 +447,30 @@ void Phenotype::update_latent(const int mloc, const double* meth) {
 #endif
     for (int i=0; i<N; i++) {
         double val = (meth[i] - mave) * msig;
-        z[i] += val * beta;
+        Xbeta[i] += val * beta;
     } 
 }
 
-void Phenotype::offset_latent(const double offset) {
-    double* z = get_z();
+void Phenotype::offset_Xbeta(const double offset) {
+    double* Xbeta = get_Xbeta();
 
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
     for (int i=0; i<N; i++) {
-        z[i] += offset;
+        Xbeta[i] += offset;
     }
 }
 
 // Update latent variable based on current covariate effect delta
-void Phenotype::update_latent_cov(const int covi, double delta) {
-    double* z = get_z();
-    for (int i=0; i<N; i++) {
-        double offset = Z_[i][covi] * delta;
-        z[i] += offset;
-    }
-}
+void Phenotype::adjust_epsilon_cov() {
 
-// Dot product for covariates
-double  Phenotype::dot_product_cov(int covi){
     double* epsilon = get_epsilon();
-    double Ze = 0.0;
-    for (int i=0; i<N; i++) {
-        Ze += epsilon[i] * Z_[i][covi];
+    for(int covi = 0; covi < C; covi++){
+        for (int i=0; i<N; i++) {
+            epsilon[i] -= Z_[i][covi] * deltas[covi];
+        }
     }
-    return Ze;
 }
 
 // Load covariate effects
@@ -484,29 +497,17 @@ void Phenotype::load_cov_deltas(){
     printf("INFO   : time to load %d covariate effects = %.2f seconds.\n", C, te - ts);
 }
 
-// Sample artificial target from truncated normal and update residual 
+// update residual 
 void Phenotype::init_epsilon(){
     double* z = get_z();
     double* epsilon = get_epsilon();
-    double* y = get_y();
+    double* Xbeta = get_Xbeta();
 
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
     for (int i=0; i<N; i++) {
-        epsilon[i] = sample_trunc_norm_rng(z[i], 1.0, y[i]) - z[i];     
-    }
-}
-
-// Add covariate contributions to base epsilon
-void Phenotype::update_epsilon_cov(const int covi, double delta) {
-    double* epsilon = get_epsilon();
-
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
-    for (int i=0; i<N; i++) {
-        epsilon[i] += delta * Z_[i][covi];  
+        epsilon[i] = z[i] - Xbeta[i];     
     }
 }
 
@@ -716,8 +717,6 @@ void Phenotype::read_file(const Options& opt) {
 
             double sqn = 0.0;
             for (int i=0; i<data.size(); i++) {
-                if (opt.verbosity_level(3) && i < 10)
-                    std::cout << data[i] - avg  << std::endl;
                 if (data[i] == std::numeric_limits<double>::max()) {
                     epsilon[i] = 0.0;
                 } else {
@@ -728,8 +727,10 @@ void Phenotype::read_file(const Options& opt) {
             sqn = sqrt(double(nonas-1) / sqn);
             if (opt.verbosity_level(3))
                 printf("phen sqn = %20.15f\n", sqn);
-            for (int i=0; i<data.size(); i++)
+            for (int i=0; i<data.size(); i++){
                 epsilon[i] *= sqn;
+                y[i] = epsilon[i];
+            }
         }    
     } else {
         std::cout << "FATAL: could not open phenotype file: " << filepath << std::endl;
@@ -743,4 +744,126 @@ void Phenotype::print_info() const {
 
 void Phenotype::set_nas_to_zero(double* y, const int N) {
 
+}
+
+void Phenotype::Newton_method_cov(){
+
+    using namespace boost::numeric::ublas;
+
+    std::vector<double> eta = std::vector<double> (C, 0.0);
+    double* y = get_y();
+    std::vector<double> gg = std::vector<double> (N, 0.0);
+    std::vector<double> eta_new;
+
+    for (int it=0; it<=500; it++){
+
+        matrix<double> WXm(N,C), Xtm(C,N);
+        vector<double> lambda(N);
+
+        for(int i=0; i<N; i++){
+
+            double g_i = gg[i] + inner_prod(Z_[i], eta, 0);
+            double arg = (2*y[i] - 1) * g_i;
+            double phi_arg = normal_cdf(arg);
+            double ratio = 2.0 /  sqrt(2*M_PI) / erfcx( - arg / sqrt(2) );
+            lambda(i) = ratio * (2*y[i]-1);
+            for (int j=0; j<C; j++){
+                Xtm(j,i) = Z_[i][j];
+                WXm(i,j) = Z_[i][j] * lambda(i) * (lambda(i) + g_i);
+            }
+        }
+
+        matrix<double> XtmZm = prod(Xtm, WXm);
+        vector<double> RHS = prod(Xtm, lambda);    
+        permutation_matrix<double> pm(XtmZm.size1());
+        
+        int sing = lu_factorize(XtmZm, pm);
+            
+        if (sing == 0)
+            lu_substitute(XtmZm, pm, RHS);
+        else
+            RHS = vector<double>(C);
+
+        eta_new = eta;
+        std::vector<double> displ(C, 0.0);
+
+        std::vector<double> grad = grad_cov(eta);
+        double scale = 1;
+        double init_val = mlogL_probit(eta);
+
+        for (int i=1; i<300; i++){
+
+            for (int j=0; j<C; j++)
+                displ[j] = scale * RHS(j);
+
+            std::transform (eta.begin(), eta.end(), displ.begin(), eta_new.begin(), std::plus<double>());
+
+            double curr_val = mlogL_probit(eta_new);
+
+            if (curr_val <= init_val + inner_prod(displ, grad,0)/2){
+                if (rank == 0)
+                    std::cout << "scale = " << scale << std::endl;
+                break;
+            }
+            scale *= 0.9;
+        }
+
+        std::vector<double> diff = eta;
+        for (int i=0; i<diff.size(); i++)
+            diff[i] -= eta_new[i];
+        double norm_eta = sqrt( l2_norm2(eta, 0) );
+        double rel_err;
+        if (norm_eta == 0)
+            rel_err = 1;
+        else
+            rel_err = sqrt( l2_norm2(diff, 0) ) / norm_eta;
+
+        if (rank == 0)
+            std::cout << "[Newton_cov] it = " << it <<", relative err = "<< rel_err << std::endl;
+        if (rel_err < 1e-4){
+            if (rank == 0)
+                std::cout << "[Newton_cov] relative error <= 1e-4 - stoping criteria satisfied" << std::endl;
+            break;
+        }
+        eta = eta_new;   
+    }
+    deltas = eta;
+}
+
+std::vector<double> Phenotype::grad_cov(std::vector<double> eta){ 
+    // gg = g_genetics, gc = g_covariates, eta = vector of covariate's effect sizes
+    double* y = get_y();
+    std::vector<double> gg = std::vector<double> (N, 0.0);
+    std::vector<double> grad(C, 0.0);
+
+    for (int j=0; j<C; j++){
+
+        for (int i=0; i<N; i++){
+            double g_i = gg[i] + inner_prod(Z_[i], eta, 0);
+            double arg = (2*y[i] - 1) / sqrt(probit_var) * g_i;
+            double ratio = 2.0 /  sqrt(2*M_PI) / erfcx( - arg / sqrt(2) );
+            grad[j] += (-1) * ratio * (2*y[i]-1) / sqrt(probit_var) * Z_[i][j]; // because we take a gradient of -logL, not of logL
+        }
+    }
+
+    for (int j=0; j<C; j++)
+        grad[j] /= N;
+
+    return grad;
+}
+
+double Phenotype::mlogL_probit(std::vector<double> eta){
+
+    double* y = get_y();
+    std::vector<double> gg = std::vector<double> (N, 0.0);
+    double mlogL = 0;
+
+#pragma omp parallel for reduction( + : mlogL )
+    for (int i=0; i<N; i++){
+        double g_i = gg[i] + inner_prod(Z_[i], eta, 0);
+        double arg = (2*y[i] - 1) / sqrt(probit_var) * g_i;
+        double phi_arg = normal_cdf(arg);
+        mlogL -= log(phi_arg);
+    }
+    return mlogL/N;
 }

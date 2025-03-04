@@ -282,6 +282,7 @@ void Bayes::process() {
     check_openmp();
 
     Phenotype& phen = pmgr.get_phens()[0];
+    std::string model = opt.get_model();
 
     phen.delete_output_files();
     phen.open_output_files();
@@ -297,33 +298,16 @@ void Bayes::process() {
     // number of covariates
     int C = opt.get_cov_num();
 
-    // Covariates
-    if(C > 0){
-        for(int covi = 0; covi < C; covi++){
-            // Update epsilon with respect to previous covariate effect
-            double delta = phen.get_cov_delta(covi);
-            phen.update_epsilon_cov(covi, delta);
-
-            double cov_num = phen.dot_product_cov(covi);
-            double cov_denom = phen.get_cov_denom(covi);
-            double delta_new = 0.0;
-
-            if(cov_denom > 0){
-                // Sample new covariate effect delta
-                // delta_new = phen.sample_norm_rng(cov_num / cov_denom, 1.0 / cov_denom);
-                delta_new = cov_num / cov_denom;
-            }
-
-            phen.set_cov_delta(covi, delta_new);
-            //printf("New delta[%d] = %0.6f\n", covi, delta_new);
-            //fflush(stdout);
-
-
-            // Update epsilon with respect to the new covariate effect
-            phen.update_epsilon_cov(covi, delta_new);
+    if (model == "probit"){
+        phen.init_Xbeta();
+        
+        // Covariates
+        if(C > 0){
+            if(rank==0)
+                printf("Newton method for covariate estimates...");
+            phen.Newton_method_cov();
+            write_ofile_cov(*(phen.get_outcov_fh()), phen.get_deltas());
         }
-
-        write_ofile_cov(*(phen.get_outcov_fh()),  phen.get_deltas());
     }
 
     for (unsigned int it = 1; it <= opt.get_iterations(); it++) {
@@ -332,32 +316,19 @@ void Bayes::process() {
 
         printf("\n\n@@@ ITERATION %5d\n", it);
 
-        std::string model = opt.get_model();
-
         if (model == "probit"){
+
+            phen.sample_latent();
+            
             // Init residual based on current latent variable 
             phen.init_epsilon();
 
-            double* z_ = phen.get_z();
-
-            double z_mean = 0.0;
-            double z_std = 0.0;
-
-            for (int i=0; i<N; i++) {
-                z_mean += z_[i];
+            if(it == 1){
+                phen.adjust_epsilon_cov();
             }
-            z_mean /= double(N);
 
-            for (int i=0; i<N; i++) {
-                z_std += (z_[i] - z_mean) * (z_[i] - z_mean);
-            }
-            z_std = sqrt(z_std / double(N));
-            printf("z_mean = %0.4f, z_std = %0.4f\n", z_mean, z_std);
-                
-            
-            // Init latent to 0
-            phen.init_latent();
-            
+            // Init Xbeta to 0
+            phen.init_Xbeta();
         }
 
         phen.offset_epsilon(phen.get_mu());
@@ -370,7 +341,7 @@ void Bayes::process() {
         phen.offset_epsilon(-phen.get_mu());
 
         if(model=="probit"){
-            phen.offset_latent(phen.get_mu());
+            phen.offset_Xbeta(phen.get_mu());
         }
 
         // Shuffling of the markers on its own PRNG (see README/wiki)
@@ -493,7 +464,7 @@ void Bayes::process() {
                     // Add current marker effect to latent variable
                     size_t methix = size_t(mloc) * size_t(N);
                     double* meth = &meth_data[methix];
-                    phen.update_latent(mloc, meth);
+                    phen.update_Xbeta(mloc, meth);
                 }
             }
 

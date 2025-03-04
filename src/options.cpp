@@ -263,7 +263,7 @@ void Options::read_group_mixture_file() {
         std::string mixture_line;
         std::regex ws_re("\\s+");
         while(getline(fs, mixture_line)) {
-            //std::cout << "::: " << mixture_line << "\n";
+            std::cout << "::: " << mixture_line << "\n";
             boost::algorithm::trim(mixture_line);
             if (mixture_line.length() == 0)  continue;
             std::vector<std::string> one_group_mixtures { 
