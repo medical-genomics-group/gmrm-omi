@@ -318,14 +318,11 @@ void Bayes::process() {
 
         if (model == "probit"){
 
-            phen.sample_latent();
+            bool include_cov = ((it == 1) & (C > 0) ? true : false);
+            phen.sample_latent(include_cov);
             
             // Init residual based on current latent variable 
-            phen.init_epsilon();
-
-            if(it == 1){
-                phen.adjust_epsilon_cov();
-            }
+            phen.init_epsilon(include_cov);
 
             // Init Xbeta to 0
             phen.init_Xbeta();

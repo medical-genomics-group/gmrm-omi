@@ -59,6 +59,7 @@ private:
     double* epsilon_ = nullptr;
     double* z_       = nullptr;
     double* Xbeta_   = nullptr;
+    double* Zdelta_  = nullptr;
     double* y_       = nullptr;
     int*    cass     = nullptr;
     double epssum = 0.0;
@@ -119,6 +120,7 @@ public:
     double* get_epsilon()     { return epsilon_; }
     double* get_z()           { return z_; }
     double* get_Xbeta()           { return Xbeta_; }
+    double* get_Zdelta()           { return Zdelta_; }
     double* get_y()           { return y_; } 
     double  get_epsilon_sum() { return epssum; }
     double  get_sigmae()      { return sigmae_; }
@@ -187,16 +189,15 @@ public:
     double get_marker_ave(const int idx) { return mave[idx]; }
     double get_marker_sig(const int idx) { return msig[idx]; }
 
-    void   sample_latent();
+    void   sample_latent(bool include_cov);
     void   init_Xbeta();
     void   update_latent(const int mloc, const double* meth);
     void   update_Xbeta(const int mloc, const double* meth);
     void   offset_latent(const double offset);
     void   offset_Xbeta(const double offset);
-    void   adjust_epsilon_cov();
     double dot_product_cov(int covi);
 
-    void   init_epsilon();
+    void   init_epsilon(bool include_cov);
     void   update_epsilon(const double* dbeta, const double* meth);
     void   update_epsilon_cov(const int covi, double delta);
     double epsilon_sumsqr();

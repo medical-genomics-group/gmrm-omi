@@ -42,7 +42,9 @@ Phenotype::Phenotype(std::string fp, const Options& opt, const int N, const int 
         z_ = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
         check_malloc(z_, __LINE__, __FILE__);
         Xbeta_ = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
-        check_malloc(z_, __LINE__, __FILE__);
+        check_malloc(Xbeta_, __LINE__, __FILE__);
+        Zdelta_ = (double*) _mm_malloc(size_t(N) * sizeof(double), 32);
+        check_malloc(Zdelta_, __LINE__, __FILE__);
     }
 
     if (opt.predict()) {
@@ -411,16 +413,25 @@ void Phenotype::shuffle_midx(const bool mimic_hydra) {
 }
 
 // Sample artificial target from truncated normal
-void Phenotype::sample_latent(){
+void Phenotype::sample_latent(bool include_cov){
     double* z = get_z();
     double* y = get_y();
     double* Xbeta = get_Xbeta();
+    double* Zdelta = get_Zdelta();
+
+    if(include_cov == true){
+        printf("INFO   : Sampling latent variable including covariate effects\n");
+    }
 
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
     for (int i=0; i<N; i++) {
-        z[i] = sample_trunc_norm_rng(Xbeta[i], 1.0, y[i]);    
+        double mean = Xbeta[i];
+        if(include_cov == true){
+            mean += Zdelta[i];
+        }
+        z[i] = sample_trunc_norm_rng(mean, 1.0, y[i]);    
     }
 }
 
@@ -462,17 +473,6 @@ void Phenotype::offset_Xbeta(const double offset) {
     }
 }
 
-// Update latent variable based on current covariate effect delta
-void Phenotype::adjust_epsilon_cov() {
-
-    double* epsilon = get_epsilon();
-    for(int covi = 0; covi < C; covi++){
-        for (int i=0; i<N; i++) {
-            epsilon[i] -= Z_[i][covi] * deltas[covi];
-        }
-    }
-}
-
 // Load covariate effects
 void Phenotype::load_cov_deltas(){
 
@@ -498,16 +498,24 @@ void Phenotype::load_cov_deltas(){
 }
 
 // update residual 
-void Phenotype::init_epsilon(){
+void Phenotype::init_epsilon(bool include_cov){
     double* z = get_z();
     double* epsilon = get_epsilon();
     double* Xbeta = get_Xbeta();
+    double* Zdelta = get_Zdelta();
+
+    if(include_cov == true){
+        printf("INFO   : Regressing out the covariate effects\n");
+    }
 
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif
     for (int i=0; i<N; i++) {
-        epsilon[i] = z[i] - Xbeta[i];     
+        if (include_cov == true)
+            epsilon[i] = z[i] - Xbeta[i] - Zdelta[i];
+        else
+            epsilon[i] = z[i] - Xbeta[i];
     }
 }
 
@@ -828,6 +836,12 @@ void Phenotype::Newton_method_cov(){
         eta = eta_new;   
     }
     deltas = eta;
+
+    for(int covi = 0; covi < C; covi++){
+        for (int i=0; i<N; i++) {
+            Zdelta_[i] -= Z_[i][covi] * deltas[covi];
+        }
+    }
 }
 
 std::vector<double> Phenotype::grad_cov(std::vector<double> eta){ 
