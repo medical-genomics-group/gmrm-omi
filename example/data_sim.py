@@ -3,6 +3,7 @@ import argparse
 import os
 import struct
 import random
+from sklearn.decomposition import PCA
 
 print("---- Simulating example i.i.d. data ----\n", flush=True)
 
@@ -10,12 +11,12 @@ print("---- Simulating example i.i.d. data ----\n", flush=True)
 parser = argparse.ArgumentParser()
 parser.add_argument("-out_dir", "--out-dir", help = "Output directory")
 parser.add_argument("-out_name", "--out-name", help="Output file name", default="example")
-parser.add_argument("-N", "--N", help="Number of individuals", default=1000)
+parser.add_argument("-N", "--N", help="Number of individuals", default=2000)
 parser.add_argument("-M", "--M", help="Number of markers", default=2000)
 parser.add_argument("-C", "--C", help="Number of covariates", default=2)
 parser.add_argument("-lam", "--lam", help="Sparsity", default=0.1)
-parser.add_argument("-epi_var", "--epi-var", help="Epigenetic component variance", default=0.5)
-parser.add_argument("-cov_var", "--cov-var", help="Covariate component variance", default=0.2)
+parser.add_argument("-epi_var", "--epi-var", help="Epigenetic component variance", default=0.8)
+parser.add_argument("-cov_var", "--cov-var", help="Covariate component variance", default=0.1)
 args = parser.parse_args()
 
 out_name = args.out_name
@@ -39,7 +40,9 @@ print("--epi-var", epi_var, flush=True)
 
 print("\n...Simulating design matrix", flush=True)
 X = np.random.normal(0,1,N*M).reshape((N,M))
+
 Z = np.random.normal(0,1,N*C).reshape((N,C)) #covariate matrix
+print(np.shape(Z))
 
 print("\n...Simulating marker effects", flush=True)
 CM = int(M * lam) # number of cuasal markers
@@ -56,7 +59,7 @@ delta = np.random.normal(0.0, np.sqrt(sigma2_cov), C)
 print("\n...Computing outcome variable", flush=True)
 g = np.matmul(X,beta)
 c = np.matmul(Z,delta)
-y = g + c + np.random.normal(0, np.sqrt( 1 - np.var(g + c)),  N) # adding Gaussian noise
+y = g + c + np.random.normal(0, np.sqrt( 1 - (np.var(g) + np.var(c))),  N) # adding Gaussian noise
 
 print("Var(y) = ", np.var(y))
 print("Var(g) = ", np.var(g))
@@ -78,6 +81,19 @@ print(phen_fpath, flush=True)
 phenf = open(phen_fpath, "w")
 for i, pheno in enumerate(y):
     line = "%d %d %0.10f\n" % (i, i, pheno)
+    phenf.write(line)
+phenf.close()
+
+ybin=np.zeros(N)
+ybin[y >= 0.5] = 1
+
+# Saving phenotype data
+print("\n...Saving bin outcome to .phen file")
+phen_fpath = os.path.join(out_dir, "%s_binary.phen" % out_name)
+print(phen_fpath, flush=True)
+phenf = open(phen_fpath, "w")
+for i, pheno in enumerate(ybin):
+    line = "%d %d %d\n" % (i, i, pheno)
     phenf.write(line)
 phenf.close()
 

@@ -423,9 +423,9 @@ void Phenotype::sample_latent(bool include_cov){
         printf("INFO   : Sampling latent variable including covariate effects\n");
     }
 
-#ifdef _OPENMP
-#pragma omp parallel for
-#endif
+//#ifdef _OPENMP
+//#pragma omp parallel for
+//#endif
     for (int i=0; i<N; i++) {
         double mean = Xbeta[i];
         if(include_cov == true){
