@@ -300,6 +300,8 @@ void Bayes::process() {
 
     if (model == "probit"){
         phen.init_Xbeta();
+
+        phen.init_mu_prior();
         
         // Covariates
         if(C > 0){
@@ -327,19 +329,24 @@ void Bayes::process() {
             // Init Xbeta to 0
             phen.init_Xbeta();
         }
-
+        
         phen.offset_epsilon(phen.get_mu());
 
         if (it == 1){
             phen.update_epsilon_sigma();
             printf("epssum = %20.15f, sigmae = %20.15f\n", phen.get_epsilon_sum(), phen.get_sigmae());
         }
-        phen.set_mu(phen.sample_norm_rng());
+        if ((model == "probit") & opt.get_model_prevalence()){
+            phen.sample_mu_probit();
+        }else{
+            phen.set_mu(phen.sample_norm_rng());
+        }
         phen.offset_epsilon(-phen.get_mu());
 
         if(model=="probit"){
             phen.offset_Xbeta(phen.get_mu());
         }
+        
 
         // Shuffling of the markers on its own PRNG (see README/wiki)
         if (opt.shuffle_markers()){
@@ -528,7 +535,7 @@ void Bayes::process() {
         // Write output files
         if (it % opt.get_output_thin_rate() == 0) {
             const unsigned nthinned = it / opt.get_output_thin_rate() - 1;
-            write_ofile_csv(*(phen.get_outcsv_fh()), it,  phen.get_sigmag(), phen.get_sigmae(), phen.get_m0_sum(), nthinned, phen.get_pi_est());
+            write_ofile_csv(*(phen.get_outcsv_fh()), it,  phen.get_sigmag(), phen.get_sigmae(), phen.get_m0_sum(), nthinned, phen.get_pi_est(), phen.get_mu());
             
             write_ofile_h1(*(phen.get_outbet_fh()), rank, Mt, it, nthinned, S, M, phen.get_betas().data(), MPI_DOUBLE);
             write_ofile_h1(*(phen.get_outcpn_fh()), rank, Mt, it, nthinned, S, M, phen.get_comp().data(),  MPI_INTEGER); 

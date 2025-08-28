@@ -152,6 +152,10 @@ void Options::read_command_line_options(int argc, char** argv) {
             test_ = true;
             ss << "--test " << test_ << "\n";
 
+        } else if (!strcmp(argv[i], "--model-prevalence")) {
+            model_prevalence = true;
+            ss << "--model-prevalence " << model_prevalence << "\n";
+
         } else if (!strcmp(argv[i], "--cov-file")) {
             if (i == argc - 1) fail_if_last(argv, i);
             cov_file = argv[++i];

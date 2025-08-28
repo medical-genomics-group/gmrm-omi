@@ -43,6 +43,7 @@ public:
     int get_cov_num() const { return cov_num; };
     std::string get_infname_base() const { return in_fname_base; };
     std::string get_model() const { return model; };
+    bool get_model_prevalence() const { return model_prevalence; }
 
 private:
     std::string bin_file = "";
@@ -57,6 +58,7 @@ private:
     bool mimic_hydra_ = false;
     bool predict_ = false;
     bool test_ = false;
+    bool model_prevalence = false;
     unsigned int seed = 0;
     unsigned int iterations = 1;
     unsigned int truncm = 0;

@@ -8,7 +8,7 @@
 
 // Original csv output file
 void write_ofile_csv(const MPI_File fh, const uint iteration, const std::vector<double>* sigmaG, const double sigmaE, const int m0_sum,
-                     const uint n_thinned_saved, const std::vector<std::vector<double>>* estPi);
+                     const uint n_thinned_saved, const std::vector<std::vector<double>>* estPi, const double mu);
 
 void write_ofile_cov(const MPI_File fh, const std::vector<double>* delta);
 

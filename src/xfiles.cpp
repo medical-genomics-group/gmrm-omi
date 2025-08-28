@@ -4,7 +4,7 @@
 
 // CSV out file
 void write_ofile_csv(const MPI_File fh, const uint iteration, const std::vector<double>* sigmaG, const double sigmaE, const int m0_sum,
-                     const uint n_thinned_saved, const std::vector<std::vector<double>>* estPi) {
+                     const uint n_thinned_saved, const std::vector<std::vector<double>>* estPi, const double mu) {
     
     int R = estPi->size();
     int C = estPi->at(0).size();
@@ -38,7 +38,9 @@ void write_ofile_csv(const MPI_File fh, const uint iteration, const std::vector<
         }
     }
         
-    
+    cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), ", %20.15f", mu);
+    assert(cx >= 0 && cx < LENBUF - strlen(buff));
+
     cx = snprintf(&buff[strlen(buff)], LENBUF - strlen(buff), "\n");
     assert(cx >= 0 && cx < LENBUF - strlen(buff));
         

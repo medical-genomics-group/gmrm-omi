@@ -67,6 +67,8 @@ private:
     std::vector<double> sigmag;
     double mu     = 0.0;
     double probit_var = 1.0;
+    double intercept_prior_mean = 0.0; //corresponds to 0.5 prevalence
+    double intercept_prior_var = 1.0;
     void read_file(const Options& opt);
     void set_output_filenames(const std::string out_dir);
 
@@ -127,6 +129,8 @@ public:
     void    set_sigmae(const double val) { sigmae_ = val; }
     std::vector<double>* get_sigmag()    { return &sigmag; }
     double  get_mu()          { return mu; }
+    void    sample_mu_probit();
+    void    init_mu_prior();
 
     void offset_epsilon(const double);
     //void update_epsilon_sum();

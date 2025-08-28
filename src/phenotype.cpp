@@ -12,6 +12,7 @@
 #include <boost/numeric/ublas/vector.hpp>
 #include <boost/numeric/ublas/matrix.hpp>
 #include <boost/numeric/ublas/lu.hpp>
+#include <boost/math/distributions/normal.hpp>
 
 namespace fs = std::filesystem;
 
@@ -360,6 +361,30 @@ double Phenotype::sample_inv_scaled_chisq_rng(const double a, const double b) {
 
 double Phenotype::sample_norm_rng(const double a, const double b) {
     return dist_d.norm_rng(a, b);
+}
+
+void Phenotype::sample_mu_probit() {
+
+    double eps_sum = 0.0;
+    for (int i = 0; i < N; i++){
+        eps_sum += epsilon_[i];
+    }
+    double vn = 1.0 / (1.0 / intercept_prior_var + N);
+    double mn = vn * (intercept_prior_mean / intercept_prior_var + eps_sum);
+    mu = sample_norm_rng(mn, sqrt(vn));
+    std::cout << "New intercept sampled: mu = " << mu << std::endl;
+}
+
+void Phenotype::init_mu_prior(){
+    double y_mean = 0.0;
+    for (int i = 0; i < N; i++){
+        y_mean += y_[i];
+    }
+    y_mean = y_mean / N;
+
+    boost::math::normal dist(0.0, 1.0);
+    intercept_prior_mean = boost::math::quantile(dist, y_mean); // inverse CDF
+    std::cout << "Prior mean for intercept initialized to " << intercept_prior_mean << std::endl;
 }
 
 double Phenotype::sample_norm_rng() {
